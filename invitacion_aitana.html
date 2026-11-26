@@ -1053,6 +1053,7 @@
 <div class="balloons" id="balloons" aria-hidden="true"></div>
 <div class="floats" id="floats" aria-hidden="true"></div>
 
+<audio id="birthdaySong" preload="metadata" src="aitana-pase-web/dist/Huntrix%20-%20GOLDEN%20%28Sub.%20Espa%C3%B1ol%20%2B%20Lyrics%29%20Kpop%20Demon%20Hunters.mp3#t=14"></audio>
 <button id="musicBtn" class="muted" hidden aria-label="Música de fondo" aria-pressed="false" title="Música de fondo">
   <span class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
   <span class="icon-mute" aria-hidden="true">🎵</span>
@@ -1335,136 +1336,31 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, ms || 3200);
   }
 
-  // ============ MUSIC (Web Audio API — music box) ============
-  var toggleMusic = (function () {
-    var AudioContext = window.AudioContext || window.webkitAudioContext;
-    var ac = null, masterGain = null, scheduled = null, isPlaying = false, loopId = null;
-
-    var N = {
-      C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
-      C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
-      C6: 1046.50, E6: 1318.51, G6: 1568.00
-    };
-
-    var BPM = 92;
-    var beat = 60 / BPM;
-    var melody = [
-      ['C5', 0, 1], ['E5', 1, 1], ['G5', 2, 1], ['C6', 3, 1.5],
-      ['B5', 4.5, 0.5], ['G5', 5, 1], ['E5', 6, 1], ['G5', 7, 1],
-      ['A5', 8, 1], ['G5', 9, 1], ['F5', 10, 1], ['E5', 11, 1],
-      ['D5', 12, 1], ['C5', 13, 1], ['G4', 14, 1], ['C5', 15, 1.5],
-      ['E5', 16, 1], ['G5', 17, 1], ['C6', 18, 1], ['E6', 19, 1.5],
-      ['D6', 20.5, 0.5], ['C6', 21, 1], ['G5', 22, 1], ['E5', 23, 1],
-      ['F5', 24, 1], ['E5', 25, 1], ['D5', 26, 1], ['C5', 27, 1],
-      ['G4', 28, 1], ['C5', 29, 1], ['E5', 30, 1], ['C5', 31, 2]
-    ];
-    var bass = [
-      ['C3', 0], ['G3', 8], ['F3', 16], ['C3', 24]
-    ];
-    var LOOP_BEATS = 32;
-    var LOOP_SECS = LOOP_BEATS * beat;
-
-    function note(freq, t0, dur, vol, type) {
-      vol = vol || 0.18;
-      type = type || 'triangle';
-      var osc = ac.createOscillator();
-      var g = ac.createGain();
-      osc.type = type;
-      osc.frequency.value = freq;
-      g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(vol, t0 + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(g); g.connect(masterGain);
-      osc.start(t0);
-      osc.stop(t0 + dur + 0.05);
-      // Music-box overtone
-      var o2 = ac.createOscillator();
-      var g2 = ac.createGain();
-      o2.type = 'sine';
-      o2.frequency.value = freq * 2;
-      g2.gain.setValueAtTime(0, t0);
-      g2.gain.linearRampToValueAtTime(vol * 0.25, t0 + 0.005);
-      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.7);
-      o2.connect(g2); g2.connect(masterGain);
-      o2.start(t0); o2.stop(t0 + dur * 0.7 + 0.05);
-    }
-
-    function scheduleLoop(startAt) {
-      for (var i = 0; i < melody.length; i++) {
-        var m = melody[i];
-        var f = N[m[0]];
-        if (!f) continue;
-        note(f, startAt + m[1] * beat, m[2] * beat * 0.95, 0.16, 'triangle');
-      }
-      for (var j = 0; j < bass.length; j++) {
-        var b = bass[j];
-        var bf = N[b[0]];
-        if (!bf) continue;
-        note(bf / 2, startAt + b[1] * beat, beat * 6, 0.05, 'sine');
-      }
-    }
-
-    async function start() {
-      if (!ac) {
-        ac = new AudioContext();
-      }
-      if (ac.state === 'suspended' || ac.state === 'interrupted') await ac.resume();
-      masterGain = ac.createGain();
-      masterGain.gain.value = 0;
-      masterGain.connect(ac.destination);
-      isPlaying = true;
-      var now = ac.currentTime;
-      masterGain.gain.cancelScheduledValues(now);
-      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-      masterGain.gain.linearRampToValueAtTime(0.5, now + 1.5);
-      scheduled = now + 0.05;
-      scheduleLoop(scheduled);
-      (function nextCycle() {
-        if (!isPlaying) return;
-        var t = ac.currentTime;
-        while (scheduled < t + LOOP_SECS * 1.2) {
-          scheduled += LOOP_SECS;
-          scheduleLoop(scheduled);
-        }
-        loopId = setTimeout(nextCycle, 1500);
-      })();
-    }
-    function stop() {
-      if (!isPlaying || !ac) return;
-      isPlaying = false;
-      if (loopId) { clearTimeout(loopId); loopId = null; }
-      var now = ac.currentTime;
-      masterGain.gain.cancelScheduledValues(now);
-      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-      masterGain.gain.linearRampToValueAtTime(0.0001, now + 0.18);
-      var stoppingGain = masterGain;
-      setTimeout(function () { stoppingGain.disconnect(); }, 220);
-    }
-    return async function toggleMusic() {
-      if (isPlaying) stop();
-      else await start();
-      return isPlaying;
-    };
-  })();
-
+  var song = document.getElementById('birthdaySong');
   var musicBtn = document.getElementById('musicBtn');
-  if (window.AudioContext || window.webkitAudioContext) {
-    musicBtn.hidden = false;
-    musicBtn.addEventListener('click', async function () {
-      if (musicBtn.getAttribute('aria-busy') === 'true') return;
-      musicBtn.setAttribute('aria-busy', 'true');
-      try {
-        var playing = await toggleMusic();
-        musicBtn.classList.toggle('muted', !playing);
-        musicBtn.setAttribute('aria-pressed', String(playing));
-        showToast(playing ? 'Música activada' : 'Música en silencio');
-      } catch (error) {
-        showToast('No se pudo activar la música. Puedes volver a intentarlo.');
-      } finally {
-        musicBtn.removeAttribute('aria-busy');
-      }
+  var songStart = 14;
+
+  function playSong() {
+    if (song.ended || song.currentTime < songStart) song.currentTime = songStart;
+    song.play().catch(function (error) {
+      if (error.name !== 'AbortError') showToast('Toca el botón de música para escuchar GOLDEN.');
     });
   }
+
+  function updateMusicButton() {
+    var playing = !song.paused && !song.ended && !song.error;
+    musicBtn.classList.toggle('muted', !playing);
+    musicBtn.setAttribute('aria-pressed', String(playing));
+    musicBtn.title = playing ? 'Pausar GOLDEN' : 'Escuchar GOLDEN';
+  }
+
+  ['play', 'pause', 'ended', 'error'].forEach(function (event) {
+    song.addEventListener(event, updateMusicButton);
+  });
+  musicBtn.addEventListener('click', function () {
+    if (song.paused || song.ended) playSong();
+    else song.pause();
+  });
 
   // ============ REVEAL INVITATION ============
   // ============ Kipo FX: esporas neón flotantes ============
@@ -1511,6 +1407,8 @@
   var cover = document.getElementById('cover');
   var invitation = document.getElementById('invitation');
   abrirBtn.addEventListener('click', function () {
+    musicBtn.hidden = false;
+    playSong();
     cover.hidden = true;
     invitation.hidden = false;
     window.scrollTo(0, 0);
